@@ -576,18 +576,53 @@
   .rankup-overlay{
     position:absolute;inset:0;z-index:600;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(0,0,0,0.55);
-    animation:fadeIn 200ms var(--ease);
+    background:rgba(0,0,0,0.6);
+    animation:ruFadeIn 300ms ease;
     pointer-events:none;
   }
   .rankup-box{
-    background:#fff;border-radius:24px;padding:36px 40px;text-align:center;
-    animation:popIn 400ms var(--ease);
+    background:#fff;border-radius:28px;padding:40px 36px 32px;text-align:center;
+    width:min(300px, 80vw);
+    animation:ruPop 500ms cubic-bezier(0.34,1.56,0.64,1);
     pointer-events:auto;
+    position:relative;overflow:hidden;
   }
-  .rankup-box .rank-emoji{font-size:56px;margin-bottom:10px;}
-  .rankup-box h2{font-size:22px;font-weight:800;margin:0 0 6px;letter-spacing:-0.4px;}
-  .rankup-box p{font-size:14px;color:var(--text-2);margin:0 0 20px;}
+  .rankup-flash{
+    position:absolute;inset:0;border-radius:28px;
+    animation:ruFlash 600ms ease forwards;
+    pointer-events:none;
+  }
+  .rankup-icon-wrap{
+    position:relative;display:inline-block;
+    animation:ruBounce 700ms cubic-bezier(0.34,1.56,0.64,1) 150ms both;
+  }
+  .rankup-icon-wrap::before{
+    content:'';position:absolute;inset:-12px;border-radius:50%;
+    background:var(--glow,#B98800);
+    animation:ruGlow 1s ease 150ms infinite alternate;
+  }
+  .rankup-box .rank-emoji{font-size:64px;line-height:1;display:block;}
+  .rankup-label{
+    font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+    opacity:0.6;margin:14px 0 4px;
+  }
+  .rankup-box h2{font-size:26px;font-weight:900;margin:0 0 6px;letter-spacing:-0.5px;}
+  .rankup-box p{font-size:14px;color:var(--text-2);margin:0 0 24px;line-height:1.5;}
+  .rankup-rays{
+    position:absolute;top:50%;left:50%;width:0;height:0;
+    pointer-events:none;
+  }
+  .rankup-ray{
+    position:absolute;width:3px;border-radius:2px;
+    transform-origin:0 0;
+    animation:ruRay 600ms ease 100ms both;
+  }
+  @keyframes ruFadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes ruPop{from{transform:scale(0.5) translateY(40px);opacity:0;}to{transform:scale(1) translateY(0);opacity:1;}}
+  @keyframes ruFlash{0%{opacity:0.5;}100%{opacity:0;}}
+  @keyframes ruBounce{from{transform:scale(0) rotate(-20deg);}to{transform:scale(1) rotate(0deg);}}
+  @keyframes ruGlow{from{opacity:0.2;transform:scale(0.9);}to{opacity:0.5;transform:scale(1.2);}}
+  @keyframes ruRay{from{opacity:1;height:0px;}50%{opacity:1;height:40px;}to{opacity:0;height:50px;}}
   @keyframes popIn{from{transform:scale(0.7);opacity:0;}to{transform:scale(1);opacity:1;}}
 
   /* ── Forced Tutorial ── */
@@ -1449,14 +1484,35 @@ function checkRankUp(){
 function showRankUpOverlay(tier){
   const el = document.createElement('div');
   el.className = 'rankup-overlay';
+
+  // 빛줄기 8개 생성
+  const rays = Array.from({length:8},(_,i)=>{
+    const angle = (i/8)*360;
+    const delay = (i*60)+'ms';
+    return `<div class="rankup-ray" style="transform:rotate(${angle}deg) translateY(-8px);background:${tier.color};animation-delay:${delay};"></div>`;
+  }).join('');
+
   el.innerHTML = `
-    <div class="rankup-box">
-      <div class="rank-emoji">${tier.icon}</div>
-      <h2>랭크 진급!</h2>
-      <p><strong>${tier.label}</strong>에 도달했어요 🎉</p>
-      <button class="btn full" onclick="this.closest('.rankup-overlay').remove()">확인</button>
+    <div class="rankup-box" style="border-top:4px solid ${tier.color};">
+      <div class="rankup-flash" style="background:${tier.bg};"></div>
+      <div class="rankup-rays">${rays}</div>
+      <div class="rankup-icon-wrap" style="--glow:${tier.color};">
+        <span class="rank-emoji">${tier.icon}</span>
+      </div>
+      <div class="rankup-label" style="color:${tier.color};">RANK UP!</div>
+      <h2 style="color:${tier.color};">${tier.label}</h2>
+      <p>새로운 등급에 도달했어요!<br/>더 높은 종목이 해금될 수도 있어요 🎉</p>
+      <button class="btn full" style="background:${tier.color};" onclick="this.closest('.rankup-overlay').remove()">확인</button>
     </div>`;
+
   $('app').appendChild(el);
+
+  // 오버레이 클릭해도 닫힘
+  el.addEventListener('click', e=>{ if(e.target===el) el.remove(); });
+
+  // 3초 후 자동 제거
+  setTimeout(()=>{ if(el.parentNode){ el.style.animation='ruFadeIn 300ms ease reverse'; setTimeout(()=>el.remove(),280); } }, 4000);
+
   confetti();
 }
 function initState(name){
