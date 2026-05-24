@@ -2309,11 +2309,9 @@ $('my-code-btn').addEventListener('click', ()=>{
   saveState();
   const code = myFriendCode();
   if(!code){ toast('코드를 생성할 수 없어요'); return; }
-  navigator.clipboard?.writeText(code).then(()=>toast('✅ 내 코드가 복사됐어요! 친구에게 공유하세요')).catch(()=>{
-    const body = $('sheet-body');
-    body.innerHTML = `<div class="h2" style="margin-bottom:8px;">내 친구 코드</div><div class="caption" style="margin-bottom:12px;">아래 코드를 복사해서 친구에게 보내세요</div><div style="background:#F2F4F6;border-radius:12px;padding:14px;font-size:13px;font-weight:700;word-break:break-all;letter-spacing:0.5px;">${code}</div><button class="btn full" style="margin-top:16px;" onclick="navigator.clipboard.writeText('${code}');toast('복사됐어요!');closeSheet()">복사하기</button>`;
-    openSheet();
-  });
+  const body = $('sheet-body');
+  body.innerHTML = `<div class="h2" style="margin-bottom:8px;">내 친구 코드</div><div class="caption" style="margin-bottom:12px;">아래 코드를 복사해서 친구에게 보내세요</div><div style="background:#F2F4F6;border-radius:12px;padding:14px;font-size:13px;font-weight:700;word-break:break-all;letter-spacing:0.5px;">${code}</div><button class="btn full" style="margin-top:16px;" onclick="navigator.clipboard.writeText('${code}').then(()=>toast('✅ 복사됐어요!')).catch(()=>toast('❌ 복사 실패 — 코드를 직접 선택해 복사하세요'))">복사하기</button>`;
+  openSheet();
 });
 
 $('add-friend-btn').addEventListener('click', ()=>{
