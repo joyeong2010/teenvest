@@ -1806,7 +1806,7 @@ function renderQuizHome(){
     return `
       <div style="margin-top:24px;display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <span style="font-size:18px;">${tier.icon}</span>
-        <span style="font-weight:800;font-size:15px;color:${tier.color};">${rankLabel} 등급 해금 (${stocks.length}개)</span>
+        <span style="font-weight:800;font-size:15px;color:${tier.color};">${rankLabel} 등급 해금</span>
       </div>
       ${stocks.map(s=>`
         <div class="card" style="display:flex;align-items:center;gap:14px;opacity:0.45;background:${tier.bg};">
@@ -1824,7 +1824,7 @@ function renderQuizHome(){
       <div style="font-size:22px;font-weight:800;letter-spacing:-0.4px;margin-bottom:8px;">뉴스 퀴즈를 풀고<br/>종목을 거래하세요</div>
       <div style="font-size:13px;opacity:0.9;">정답을 맞히면 해당 종목 거래가 열려요</div>
     </div>
-    <h2 class="h2" style="margin-top:24px;">🔒 퀴즈 가능 종목 ${quizzable.length}개</h2>
+    <h2 class="h2" style="margin-top:24px;">🔒 퀴즈 가능 종목</h2>
     ${quizzable.length===0 && lockedRanksSorted.length===0
       ? `<div class="empty"><div class="ico">🎉</div><div class="msg">모든 종목을 해금했어요!</div></div>`
       : quizzableSection}
