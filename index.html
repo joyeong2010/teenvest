@@ -1906,22 +1906,28 @@ window.finishQuiz = finishQuiz;
 
 function showResult(code){
   const s = getStock(code);
+  const rankLocked = isRankLocked(s);
+  const req = rankLocked ? RANK_TIERS.find(t=>t.label===s.rank) : null;
   $('quiz-body').innerHTML = `
     <div class="result-hero">
-      <div class="emoji">🎉</div>
-      <h2>해금 완료!</h2>
-      <p>이제 ${s.name}을(를) 거래할 수 있어요</p>
+      <div class="emoji">${rankLocked ? '📚' : '🎉'}</div>
+      <h2>${rankLocked ? '학습 완료!' : '해금 완료!'}</h2>
+      <p>${rankLocked
+        ? `${req?.icon||''} <b>${s.rank} 등급</b> 달성 후 거래할 수 있어요`
+        : `이제 ${s.name}을(를) 거래할 수 있어요`}</p>
     </div>
     <div class="unlocked-list">
       <div class="unlocked-row">
-        <div class="ico">🔓</div>
+        <div class="ico">${rankLocked ? '🔐' : '🔓'}</div>
         <div>
-          <div class="name">${s.name}</div>
-          <div class="caption">${s.sector}</div>
+          <div class="name">${s.flag||''}${s.name}</div>
+          <div class="caption">${rankLocked ? `${s.rank} 등급 필요` : s.sector}</div>
         </div>
       </div>
     </div>
-    <button class="btn full" onclick="go('detail',{code:'${code}'})">📈 ${s.name} 투자하러 가기</button>
+    ${rankLocked
+      ? `<button class="btn full" disabled style="opacity:0.45;cursor:not-allowed;">🔐 ${s.rank} 등급 달성 후 거래 가능</button>`
+      : `<button class="btn full" onclick="go('detail',{code:'${code}'})">📈 ${s.name} 투자하러 가기</button>`}
     <button class="btn full secondary" style="margin-top:8px;" onclick="renderQuizHome()">다른 종목 해금하기</button>
   `;
 }
@@ -2206,6 +2212,14 @@ function openTrade(mode){
   tradeQty = 1;
   const code = currentDetailCode;
   const s = getStock(code);
+
+  // 등급 잠금 체크 — 퀴즈를 풀어도 등급 미달이면 거래 불가
+  if(isRankLocked(s)){
+    const req = RANK_TIERS.find(t=>t.label===s.rank);
+    toast(`🔐 ${req?.icon||''} ${s.rank} 등급 달성 후 거래 가능해요`);
+    return;
+  }
+
   const price = getPrice(code);
   const holding = state.holdings[code]?.qty || 0;
   const maxBuy = Math.floor(state.cash / price);
