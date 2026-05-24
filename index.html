@@ -642,9 +642,9 @@
     </div>
 
     <div class="step" data-step="2">
-      <h2>1,000만원으로<br/>모의투자를 시작해요</h2>
-      <div class="big-money">₩ 10,000,000</div>
-      <p>뉴스 퀴즈를 풀면<br/>거래할 수 있는 종목이 늘어나요</p>
+      <h2>300만원으로<br/>모의투자를 시작해요</h2>
+      <div class="big-money">₩ 3,000,000</div>
+      <p>퀴즈 정답·미션·첫 거래로<br/>보너스 현금을 획득해봐요!</p>
       <button class="btn-white" id="ob-start">시작하기</button>
     </div>
   </div>
@@ -807,6 +807,9 @@
 
       <div id="my-tier-card"></div>
 
+      <h2 class="h2" style="margin-top:24px;">🎁 보너스 현황</h2>
+      <div class="card" id="my-bonus-card"></div>
+
       <h2 class="h2" style="margin-top:24px;">🎯 퀴즈 통계</h2>
       <div class="stat-grid">
         <div class="stat-cell"><div class="v num" id="my-correct">0%</div><div class="l">정답률</div></div>
@@ -883,7 +886,7 @@
    ============================================================ */
 const STORAGE_KEY = 'teenvest_v1';
 const PLAYERS_KEY  = 'teenvest_players_v1';
-const INITIAL_CASH = 10000000;
+const INITIAL_CASH = 3000000;
 
 /* ── Rank tiers (return %) ── */
 const RANK_TIERS = [
@@ -1071,7 +1074,10 @@ let state = {
   transactions:[],
   quizHistory:[],
   prices:{},
-  lastRankLabel:'브론즈'
+  lastRankLabel:'브론즈',
+  achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
+  lastMissionBonus:'',
+  totalBonusEarned:0
 };
 
 function loadState(){
@@ -1142,6 +1148,16 @@ function getLeaderboard(){
 }
 
 /* ── Rank-up detection & overlay ── */
+function awardBonus(amount, reason){
+  state.cash += amount;
+  state.totalBonusEarned = (state.totalBonusEarned||0) + amount;
+  saveState();
+  setTimeout(()=>{
+    confetti();
+    toast(`🎁 ${reason}! +${fmt(amount)}원 보너스`);
+  }, 300);
+}
+
 function checkRankUp(){
   const pct = totalReturn().pct;
   const tier = getRankTier(pct);
@@ -1153,6 +1169,11 @@ function checkRankUp(){
     saveState();
     if(newIdx > prevIdx) showRankUpOverlay(tier);
   }
+  // 수익률 보너스
+  if(!state.achievements) state.achievements = {};
+  if(pct >= 5  && !state.achievements.ret5)  { state.achievements.ret5  = true; awardBonus(300000,  '수익률 +5% 달성'); }
+  if(pct >= 10 && !state.achievements.ret10) { state.achievements.ret10 = true; awardBonus(500000,  '수익률 +10% 달성'); }
+  if(pct >= 20 && !state.achievements.ret20) { state.achievements.ret20 = true; awardBonus(1000000, '수익률 +20% 달성'); }
 }
 
 function showRankUpOverlay(tier){
@@ -1177,7 +1198,10 @@ function initState(name){
     transactions:[],
     quizHistory:[],
     prices:{},
-    lastRankLabel:'브론즈'
+    lastRankLabel:'브론즈',
+    achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
+    lastMissionBonus:'',
+    totalBonusEarned:0
   };
   STOCKS.forEach(s=>{
     state.prices[s.code] = { current:s.price, prev:s.price, base:s.price };
@@ -1510,12 +1534,24 @@ function onQuizAnswer(idx){
     if(!state.unlockedStocks.includes(currentQuiz.code)){
       state.unlockedStocks.push(currentQuiz.code);
     }
+    // 퀴즈 정답 보너스 +5만원
+    state.cash += 50000;
+    state.totalBonusEarned = (state.totalBonusEarned||0) + 50000;
     saveState();
     setTimeout(()=>{
       confetti();
       const s = getStock(currentQuiz.code);
-      toast(`🎉 ${s.name} 거래가 해금되었습니다!`);
+      toast(`🎉 ${s.name} 해금 + 정답 보너스 +5만원!`);
     }, 200);
+    // 일일 미션 달성 체크 (오늘 3문제 정답)
+    const todayStr = new Date().toDateString();
+    const todayCorrect = state.quizHistory.filter(q=>
+      new Date(q.timestamp).toDateString()===todayStr && q.correct
+    ).length + 1; // +1 for current answer not yet pushed
+    if(todayCorrect >= 3 && state.lastMissionBonus !== todayStr){
+      state.lastMissionBonus = todayStr;
+      setTimeout(()=>awardBonus(100000, '오늘의 미션 완료'), 1500);
+    }
   } else {
     saveState();
   }
@@ -1957,8 +1993,12 @@ function doTrade(mode, code, qty){
     const sign = realizedPnl >= 0 ? '+' : '';
     const emoji = realizedPnl >= 0 ? '🟢' : '🔻';
     toast(`${emoji} ${s.name} ${qty}주 매도 · 실현손익 ${sign}${fmtKRW(realizedPnl)}`);
+    if(!state.achievements) state.achievements = {};
+    if(!state.achievements.firstSell){ state.achievements.firstSell=true; setTimeout(()=>awardBonus(200000,'첫 매도 달성'),800); }
   } else {
     toast(`✓ ${s.name} ${qty}주 매수 완료`);
+    if(!state.achievements) state.achievements = {};
+    if(!state.achievements.firstBuy){ state.achievements.firstBuy=true; setTimeout(()=>awardBonus(200000,'첫 매수 달성'),800); }
   }
   setTimeout(()=>renderDetail(code), 100);
   if(mode === 'buy')  setTimeout(()=>ftutCheck('ftut-buy-done'),  220);
@@ -2028,6 +2068,32 @@ function renderMy(){
       </div>`;
     }).join('');
   }
+
+  // 보너스 현황 카드
+  const ach = state.achievements || {};
+  const bonusList = [
+    { label:'퀴즈 정답', sub:'정답 1회당', amount:50000, done: (state.quizHistory||[]).filter(q=>q.correct).length > 0 },
+    { label:'오늘의 미션', sub:'하루 3문제 정답', amount:100000, done: !!state.lastMissionBonus },
+    { label:'첫 매수 달성', sub:'처음으로 주식 구매', amount:200000, done: !!ach.firstBuy },
+    { label:'첫 매도 달성', sub:'처음으로 주식 판매', amount:200000, done: !!ach.firstSell },
+    { label:'수익률 +5%', sub:'총자산 기준', amount:300000, done: !!ach.ret5 },
+    { label:'수익률 +10%', sub:'총자산 기준', amount:500000, done: !!ach.ret10 },
+    { label:'수익률 +20%', sub:'총자산 기준', amount:1000000, done: !!ach.ret20 },
+  ];
+  const totalBonus = state.totalBonusEarned || 0;
+  $('my-bonus-card').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="color:var(--text-2);">총 획득 보너스</span>
+      <span class="num" style="font-weight:800;font-size:17px;color:var(--primary);">+${fmtKRW(totalBonus)}</span>
+    </div>
+    ${bonusList.map(b=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid #F2F4F6;">
+        <div>
+          <div style="font-size:14px;font-weight:600;${b.done?'':'color:var(--text-3);'}">${b.done?'✅':'⬜'} ${b.label}</div>
+          <div class="caption">${b.sub}</div>
+        </div>
+        <div class="num" style="font-weight:700;font-size:14px;${b.done?'color:var(--primary)':'color:var(--text-3)'};">+${fmtKRW(b.amount)}</div>
+      </div>`).join('')}`;
 
   const total = state.quizHistory.length;
   const right = state.quizHistory.filter(q=>q.correct).length;
