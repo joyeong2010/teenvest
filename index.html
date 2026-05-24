@@ -2585,13 +2585,14 @@ function tickPrices(){
     $('home-total').textContent = fmtKRW(t);
     const r = totalReturn();
     $('home-delta').textContent = `${fmtSign(r.diff)}원 (${r.pct>=0?'+':''}${r.pct.toFixed(2)}%)`;
+    const rankTier = getRankTier(investReturn().pct);
+    $('home-rank-badge').textContent = `${rankTier.icon} ${rankTier.label}`;
   } else if(id==='screen-invest'){
     renderInvest();
   } else if(id==='screen-detail'){
     updateDetailPrice();
   } else if(id==='screen-my'){
-    $('my-eval').textContent = fmtKRW(totalEval());
-    $('my-total').textContent = fmtKRW(totalAsset());
+    renderMy();
   }
 }
 
