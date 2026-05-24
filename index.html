@@ -1721,42 +1721,58 @@ function renderQuiz(){
 }
 function renderQuizHome(){
   const body = $('quiz-body');
-  // 등급이 충족된 종목 중 아직 퀴즈 미완료인 것만 표시
   const quizzable = STOCKS.filter(s=>!isRankLocked(s) && !state.unlockedStocks.includes(s.code));
-  // 등급 미달로 잠긴 종목 (퀴즈 불가)
-  const rankLocked = STOCKS.filter(s=>isRankLocked(s));
+
+  // 등급 미달 종목을 등급 순서대로 그룹핑
+  const lockedByRank = {};
+  STOCKS.filter(s=>isRankLocked(s)).forEach(s=>{
+    if(!lockedByRank[s.rank]) lockedByRank[s.rank] = [];
+    lockedByRank[s.rank].push(s);
+  });
+  // RANK_ORDER 순서대로 정렬된 등급 목록
+  const lockedRanksSorted = RANK_ORDER.filter(r=>lockedByRank[r]);
+
+  const quizzableSection = quizzable.length===0
+    ? `<div class="empty"><div class="ico">⬆️</div><div class="msg">현재 등급에서 퀴즈할 종목이 없어요<br/>등급을 올려 더 많은 종목을 해금하세요</div></div>`
+    : quizzable.map(s=>`
+      <div class="card" style="display:flex;align-items:center;gap:14px;cursor:pointer;" onclick="startQuiz('${s.code}')">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--locked-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">🔒</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;">${s.flag||''}${s.name}</div>
+          <div class="caption">${s.sector}</div>
+        </div>
+        <button class="btn sm">풀기</button>
+      </div>`).join('');
+
+  const lockedSection = lockedRanksSorted.map(rankLabel=>{
+    const tier = RANK_TIERS.find(t=>t.label===rankLabel);
+    const stocks = lockedByRank[rankLabel];
+    return `
+      <div style="margin-top:24px;display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:18px;">${tier.icon}</span>
+        <span style="font-weight:800;font-size:15px;color:${tier.color};">${rankLabel} 등급 해금 (${stocks.length}개)</span>
+      </div>
+      ${stocks.map(s=>`
+        <div class="card" style="display:flex;align-items:center;gap:14px;opacity:0.45;background:${tier.bg};">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:center;font-size:20px;">🔐</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:15px;color:${tier.color};">${s.flag||''}${s.name}</div>
+            <div class="caption">${s.sector}</div>
+          </div>
+        </div>`).join('')}`;
+  }).join('');
+
   body.innerHTML = `
     <div class="card" style="background:linear-gradient(135deg,#FFC233 0%,#FFA000 100%);color:#fff;">
       <div style="font-size:14px;opacity:0.9;margin-bottom:4px;">🎯 학습으로 해금</div>
       <div style="font-size:22px;font-weight:800;letter-spacing:-0.4px;margin-bottom:8px;">뉴스 퀴즈를 풀고<br/>종목을 거래하세요</div>
-      <div style="font-size:13px;opacity:0.9;">퀴즈 가능 종목: 현재 등급에서 해금 가능한 종목만 표시돼요</div>
+      <div style="font-size:13px;opacity:0.9;">정답을 맞히면 해당 종목 거래가 열려요</div>
     </div>
     <h2 class="h2" style="margin-top:24px;">🔒 퀴즈 가능 종목 ${quizzable.length}개</h2>
-    ${quizzable.length===0 && rankLocked.length===0
+    ${quizzable.length===0 && lockedRanksSorted.length===0
       ? `<div class="empty"><div class="ico">🎉</div><div class="msg">모든 종목을 해금했어요!</div></div>`
-      : quizzable.length===0
-        ? `<div class="empty"><div class="ico">⬆️</div><div class="msg">현재 등급에서 퀴즈할 종목이 없어요<br/>등급을 올려 더 많은 종목을 해금하세요</div></div>`
-        : quizzable.map(s=>`
-        <div class="card" style="display:flex;align-items:center;gap:14px;cursor:pointer;" onclick="startQuiz('${s.code}')">
-          <div style="width:44px;height:44px;border-radius:12px;background:var(--locked-bg);display:flex;align-items:center;justify-content:center;font-size:20px;">🔒</div>
-          <div style="flex:1;">
-            <div style="font-weight:700;font-size:15px;">${s.flag||''}${s.name}</div>
-            <div class="caption">${s.sector}</div>
-          </div>
-          <button class="btn sm">풀기</button>
-        </div>`).join('')}
-    ${rankLocked.length>0 ? `
-    <h2 class="h2" style="margin-top:24px;">🔐 등급 미달 잠금 ${rankLocked.length}개</h2>
-    ${rankLocked.map(s=>{
-      const req = RANK_TIERS.find(t=>t.label===s.rank);
-      return `<div class="card" style="display:flex;align-items:center;gap:14px;opacity:0.5;">
-        <div style="width:44px;height:44px;border-radius:12px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;font-size:20px;">🔐</div>
-        <div style="flex:1;">
-          <div style="font-weight:700;font-size:15px;">${s.flag||''}${s.name}</div>
-          <div class="caption">${req?.icon||''} ${s.rank} 등급 달성 시 해금</div>
-        </div>
-      </div>`;
-    }).join('')}` : ''}
+      : quizzableSection}
+    ${lockedSection}
   `;
 }
 
