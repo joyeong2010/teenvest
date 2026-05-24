@@ -657,7 +657,10 @@
         <div class="label">총 평가금액</div>
         <div class="amount num" id="home-total">3,000,000원</div>
         <div class="delta num" id="home-delta">+0원 (0.00%)</div>
-        <div class="rank-badge" id="home-rank-badge">🥉 브론즈</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0;">
+          <div class="rank-badge" id="home-rank-badge">🥉 브론즈</div>
+          <div class="rank-badge" id="home-xp-badge" style="margin-left:6px;">🌱 Lv.1 · 0 XP</div>
+        </div>
       </div>
 
       <div class="card" id="tutorial-banner" onclick="startTutorial()" style="display:flex;align-items:center;gap:14px;cursor:pointer;margin-bottom:12px;">
@@ -701,6 +704,7 @@
         <button data-cat="바이오">바이오</button>
         <button data-cat="철강">철강</button>
         <button data-cat="금융">금융</button>
+        <button data-cat="전기차">전기차</button>
       </div>
       <div id="news-list"></div>
     </div>
@@ -805,6 +809,7 @@
         </div>
       </div>
 
+      <div id="my-level-card"></div>
       <div id="my-tier-card"></div>
 
       <h2 class="h2" style="margin-top:24px;">🎁 보너스 현황</h2>
@@ -904,17 +909,46 @@ function getRankTier(pct){
   return t;
 }
 
+const LEVEL_TIERS = [
+  { level:1, minXp:0,    label:'입문',   icon:'🌱', color:'#16A34A', bg:'#F0FDF4', stocks:'기본 한국 주식 3종목' },
+  { level:2, minXp:300,  label:'초급',   icon:'📈', color:'#3182F6', bg:'#EFF6FF', stocks:'중가 한국 주식 4종목 추가' },
+  { level:3, minXp:800,  label:'중급',   icon:'🚀', color:'#7C3AED', bg:'#EDE9FE', stocks:'고가 주식 + 미국 주식 6종목 추가' },
+  { level:4, minXp:1800, label:'고급',   icon:'💎', color:'#B98800', bg:'#FFF5D6', stocks:'엔비디아·버크셔 등 최고가 2종목 추가' },
+];
+
+function getCurrentLevel(){
+  const xp = state.xp || 0;
+  let t = LEVEL_TIERS[0];
+  for(const r of LEVEL_TIERS){ if(xp >= r.minXp) t = r; }
+  return t;
+}
+
+function getNextLevel(){
+  const cur = getCurrentLevel();
+  return LEVEL_TIERS.find(t => t.level === cur.level + 1) || null;
+}
+
 const STOCKS = [
-  { code:'005930', name:'삼성전자',    sector:'반도체', price:71000,  about:'한국을 대표하는 글로벌 반도체·전자 기업. 메모리 반도체와 스마트폰에서 세계 1위.' },
-  { code:'000660', name:'SK하이닉스',  sector:'반도체', price:195000, about:'세계 2위 메모리 반도체 기업. HBM(고대역폭 메모리) 시장 선두주자.' },
-  { code:'035420', name:'NAVER',       sector:'IT',     price:215000, about:'한국 최대 포털 및 콘텐츠 플랫폼 기업. AI·웹툰·커머스로 사업 확장 중.' },
-  { code:'035720', name:'카카오',      sector:'IT',     price:52000,  about:'국민 메신저 카카오톡 운영사. 핀테크·콘텐츠·모빌리티 등 다양한 사업 영위.' },
-  { code:'005380', name:'현대차',      sector:'자동차', price:245000, about:'한국 최대 완성차 제조사. 전기차 아이오닉 시리즈로 글로벌 EV 시장 공략.' },
-  { code:'373220', name:'LG에너지솔루션', sector:'배터리', price:405000, about:'세계 1·2위를 다투는 전기차 배터리 제조사. 글로벌 OEM 다수에 공급.' },
-  { code:'068270', name:'셀트리온',    sector:'바이오', price:178000, about:'국내 대표 바이오시밀러 기업. 항체 의약품 분야 글로벌 경쟁력 보유.' },
-  { code:'005490', name:'POSCO홀딩스', sector:'철강',   price:385000, about:'세계적 철강 기업. 리튬·니켈 등 2차전지 소재 사업으로 사업 다각화.' },
-  { code:'105560', name:'KB금융',      sector:'금융',   price:76000,  about:'국내 4대 금융지주 중 하나. 국민은행을 중심으로 한 종합 금융그룹.' },
-  { code:'207940', name:'삼성바이오로직스', sector:'바이오', price:925000, about:'세계 최대 바이오의약품 위탁생산(CMO) 기업. 글로벌 제약사 다수와 계약.' }
+  { code:'005930', name:'삼성전자',    sector:'반도체', price:71000,  level:1, about:'한국을 대표하는 글로벌 반도체·전자 기업. 메모리 반도체와 스마트폰에서 세계 1위.' },
+  { code:'035720', name:'카카오',      sector:'IT',     price:52000,  level:1, about:'국민 메신저 카카오톡 운영사. 핀테크·콘텐츠·모빌리티 등 다양한 사업 영위.' },
+  { code:'105560', name:'KB금융',      sector:'금융',   price:76000,  level:1, about:'국내 4대 금융지주 중 하나. 국민은행을 중심으로 한 종합 금융그룹.' },
+  { code:'035420', name:'NAVER',       sector:'IT',     price:215000, level:2, about:'한국 최대 포털 및 콘텐츠 플랫폼 기업. AI·웹툰·커머스로 사업 확장 중.' },
+  { code:'005380', name:'현대차',      sector:'자동차', price:245000, level:2, about:'한국 최대 완성차 제조사. 전기차 아이오닉 시리즈로 글로벌 EV 시장 공략.' },
+  { code:'000660', name:'SK하이닉스',  sector:'반도체', price:195000, level:2, about:'세계 2위 메모리 반도체 기업. HBM(고대역폭 메모리) 시장 선두주자.' },
+  { code:'068270', name:'셀트리온',    sector:'바이오', price:178000, level:2, about:'국내 대표 바이오시밀러 기업. 항체 의약품 분야 글로벌 경쟁력 보유.' },
+  { code:'373220', name:'LG에너지솔루션', sector:'배터리', price:405000, level:3, about:'세계 1·2위를 다투는 전기차 배터리 제조사. 글로벌 OEM 다수에 공급.' },
+  { code:'005490', name:'POSCO홀딩스', sector:'철강',   price:385000, level:3, about:'세계적 철강 기업. 리튬·니켈 등 2차전지 소재 사업으로 사업 다각화.' },
+  { code:'207940', name:'삼성바이오로직스', sector:'바이오', price:925000, level:3, about:'세계 최대 바이오의약품 위탁생산(CMO) 기업. 글로벌 제약사 다수와 계약.' },
+  { code:'TSLA', name:'테슬라', sector:'전기차', price:255000, level:3, flag:'🇺🇸',
+    about:'일론 머스크가 이끄는 세계 1위 전기차 기업. 모델 Y·사이버트럭으로 글로벌 EV 시장을 선도.' },
+  { code:'AAPL', name:'애플', sector:'IT', price:270000, level:3, flag:'🇺🇸',
+    about:'아이폰·맥·애플워치로 유명한 세계 최대 IT 기업. 애플 인텔리전스 AI 기능으로 재도약 중.' },
+  { code:'MSFT', name:'마이크로소프트', sector:'IT', price:570000, level:3, flag:'🇺🇸',
+    about:'윈도우·오피스·애저 클라우드를 운영하는 글로벌 소프트웨어 제국. OpenAI 최대 투자사.' },
+  { code:'NVDA', name:'엔비디아', sector:'반도체', price:870000, level:4, flag:'🇺🇸',
+    about:'AI 가속기 GPU 시장 1위. H100·H200 칩으로 전 세계 AI 데이터센터를 장악한 반도체 공룡.' },
+  { code:'BRK-B', name:'버크셔 해서웨이', sector:'금융', price:630000, level:4, flag:'🇺🇸',
+    about:'워런 버핏이 이끄는 전설적 투자 지주회사. 코카콜라·애플·아메리칸익스프레스 등을 보유.' },
 ];
 
 // 뉴스 데이터: src(언론사), url(원문 검색 링크), time(상대 시간)
@@ -997,7 +1031,32 @@ const NEWS = [
     title:'SK하이닉스, 청주 M15X 공장 본격 가동',
     summary:'15조원이 투입된 차세대 메모리 생산기지가 본격 가동에 들어갔다.',
     body:'SK하이닉스가 15조원을 투자한 청주 M15X 공장이 본격 가동에 들어갔다. 차세대 D램과 HBM 생산기지로 활용되며, 연간 매출 30조원의 신규 매출을 창출할 것으로 기대된다. AI 메모리 시장 수요 폭증에 대응한 선제적 투자가 결실을 맺고 있다.',
-    url:'https://search.naver.com/search.naver?where=news&query=SK%ED%95%98%EC%9D%B4%EB%8B%89%EC%8A%A4+M15X+%EC%B2%AD%EC%A3%BC%EA%B3%B5%EC%9E%A5' }
+    url:'https://search.naver.com/search.naver?where=news&query=SK%ED%95%98%EC%9D%B4%EB%8B%89%EC%8A%A4+M15X+%EC%B2%AD%EC%A3%BC%EA%B3%B5%EC%9E%A5' },
+  { id:16, code:'TSLA', cat:'전기차', src:'블룸버그', time:'2시간 전',
+    title:'테슬라, 모델 Y 신형 전 세계 동시 출시…주행거리 대폭 향상',
+    summary:'업그레이드된 인테리어와 늘어난 주행거리로 글로벌 시장 공략에 나섰다.',
+    body:'테슬라가 베스트셀러 모델 Y의 부분 변경 모델을 전 세계에 동시 출시했다. 신형 모델 Y는 인테리어를 대폭 개선하고 1회 충전 주행거리를 늘렸다. 중국 BYD와의 경쟁이 치열해지는 가운데 기술 혁신으로 프리미엄 시장을 지키겠다는 전략이다.',
+    url:'https://search.naver.com/search.naver?where=news&query=%ED%85%8C%EC%8A%AC%EB%9D%BC+%EB%AA%A8%EB%8D%B8Y+%EC%8B%A0%ED%98%95' },
+  { id:17, code:'AAPL', cat:'IT', src:'더버지', time:'5시간 전',
+    title:'애플, 아이폰17에 애플 인텔리전스 전면 탑재 예고',
+    summary:'AI 기능이 카메라·Siri·메모 앱 전반에 걸쳐 대폭 강화된다.',
+    body:'애플이 오는 가을 출시 예정인 아이폰17에 자체 AI 플랫폼 애플 인텔리전스를 전면 탑재할 것으로 알려졌다. 사진 편집, 문서 요약, 맞춤형 이모지 등 다양한 AI 기능이 추가된다. 아이폰 교체 수요를 이끌 핵심 동력으로 기대를 모으고 있다.',
+    url:'https://search.naver.com/search.naver?where=news&query=%EC%95%A0%ED%94%8C+%EC%95%84%EC%9D%B4%ED%8F%B017+%EC%9D%B8%ED%85%94%EB%A6%AC%EC%A0%84%EC%8A%A4' },
+  { id:18, code:'MSFT', cat:'IT', src:'CNBC', time:'8시간 전',
+    title:'마이크로소프트, Azure AI 매출 분기 50% 성장…클라우드 강자 굳건',
+    summary:'OpenAI 협력 효과로 기업용 AI 서비스 수요가 폭발적으로 늘었다.',
+    body:'마이크로소프트의 클라우드 플랫폼 애저가 AI 수요에 힘입어 분기 매출 50% 성장을 기록했다. OpenAI와의 협력으로 코파일럿 등 기업용 AI 도구 채택이 빠르게 확산되고 있다. 아마존 AWS, 구글 클라우드와의 격차도 점점 좁히고 있다.',
+    url:'https://search.naver.com/search.naver?where=news&query=%EB%A7%88%EC%9D%B4%ED%81%AC%EB%A1%9C%EC%86%8C%ED%94%84%ED%8A%B8+Azure+AI+%EC%84%B1%EC%9E%A5' },
+  { id:19, code:'NVDA', cat:'반도체', src:'로이터', time:'3시간 전',
+    title:'엔비디아, GB200 NVL72 출하 본격화…AI 인프라 수요 독식',
+    summary:'차세대 블랙웰 아키텍처 기반 서버 시스템 공급이 시작됐다.',
+    body:'엔비디아가 차세대 블랙웰 아키텍처 기반 AI 서버 시스템 GB200 NVL72의 대량 출하를 시작했다. 아마존·마이크로소프트·구글 등 빅테크의 수요가 공급을 압도하고 있으며 대기 기간이 수개월에 달한다. AI 인프라 투자 사이클이 장기화되며 엔비디아의 독주가 이어질 전망이다.',
+    url:'https://search.naver.com/search.naver?where=news&query=%EC%97%94%EB%B9%84%EB%94%94%EC%95%84+GB200+%EB%B8%94%EB%9E%99%EC%9B%B0' },
+  { id:20, code:'BRK-B', cat:'금융', src:'WSJ', time:'6시간 전',
+    title:'버크셔 해서웨이, 현금 보유액 사상 최대…워런 버핏 "기다린다"',
+    summary:'3천억 달러가 넘는 현금을 쌓으며 대형 인수합병 기회를 노리고 있다.',
+    body:'워런 버핏이 이끄는 버크셔 해서웨이의 현금·단기채권 보유액이 사상 최대를 기록했다. 버핏은 주주 서한에서 적정 가격의 투자 대상을 기다리겠다고 밝혔다. 시장에서는 버크셔의 대규모 현금이 경기 침체를 대비한 전략이라는 분석도 나오고 있다.',
+    url:'https://search.naver.com/search.naver?where=news&query=%EB%B2%84%ED%81%AC%EC%85%94+%ED%95%B4%EC%84%9C%EC%9B%A8%EC%9D%B4+%ED%98%84%EA%B8%88+%EB%B2%84%ED%95%8F' },
 ];
 
 const QUIZZES = {
@@ -1060,7 +1119,37 @@ const QUIZZES = {
     options:['신약 개발','항암제 위탁생산','임상시험','유통'],
     answer:1,
     explain:'약 1조원 규모의 <b>항암제 위탁생산(CMO)</b> 계약이에요. 5공장 가동에 맞춰 회사의 글로벌 CMO 입지가 강화되고 있어요.'
-  }
+  },
+  'TSLA': {
+    q:'테슬라 전기차의 핵심 동력원은?',
+    options:['수소연료전지','배터리팩','내연기관','태양광패널'],
+    answer:1,
+    explain:'테슬라 차량의 핵심은 <b>배터리팩</b>이에요. 주행거리와 성능을 결정하는 가장 중요한 부품이에요.'
+  },
+  'AAPL': {
+    q:'애플이 2024년 발표한 자체 AI 기능의 이름은?',
+    options:['구글 AI','애플 인텔리전스','코파일럿','빅스비'],
+    answer:1,
+    explain:'<b>애플 인텔리전스(Apple Intelligence)</b>는 애플이 2024년 발표한 AI 기능이에요. Siri와 시스템 전반에 AI를 통합했어요.'
+  },
+  'MSFT': {
+    q:'마이크로소프트의 클라우드 서비스 이름은?',
+    options:['AWS','애저(Azure)','GCP','오라클클라우드'],
+    answer:1,
+    explain:'<b>애저(Azure)</b>는 마이크로소프트의 클라우드 플랫폼이에요. AWS에 이어 세계 2위 클라우드 서비스예요.'
+  },
+  'NVDA': {
+    q:'엔비디아가 AI 시장에서 독보적인 이유가 되는 핵심 제품은?',
+    options:['스마트폰 칩','GPU(그래픽처리장치)','메모리 반도체','배터리'],
+    answer:1,
+    explain:'엔비디아의 <b>GPU</b>는 AI 학습에 최적화되어 있어요. H100 등의 AI 가속기는 전 세계 데이터센터에서 쓰이고 있어요.'
+  },
+  'BRK-B': {
+    q:'버크셔 해서웨이를 이끄는 전설적인 투자자는?',
+    options:['조지 소로스','워런 버핏','피터 린치','레이 달리오'],
+    answer:1,
+    explain:'<b>워런 버핏</b>은 "오마하의 현인"으로 불리는 투자의 전설이에요. 장기 가치 투자로 세계적인 부를 쌓았어요.'
+  },
 };
 
 /* ============================================================
@@ -1077,7 +1166,8 @@ let state = {
   lastRankLabel:'브론즈',
   achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
   lastMissionBonus:'',
-  totalBonusEarned:0
+  totalBonusEarned:0,
+  xp:0
 };
 
 function loadState(){
@@ -1158,6 +1248,29 @@ function awardBonus(amount, reason){
   }, 300);
 }
 
+function gainXP(amount){
+  const prevLv = getCurrentLevel();
+  state.xp = (state.xp || 0) + amount;
+  saveState();
+  const newLv = getCurrentLevel();
+  if(newLv.level > prevLv.level) showLevelUpOverlay(newLv);
+}
+
+function showLevelUpOverlay(lv){
+  const el = document.createElement('div');
+  el.className = 'rankup-overlay';
+  el.innerHTML = `
+    <div class="rankup-box">
+      <div class="rank-emoji">${lv.icon}</div>
+      <h2>레벨 업!</h2>
+      <p><strong>Lv.${lv.level} ${lv.label}</strong> 달성! 🎉</p>
+      <p style="font-size:13px;color:var(--text-2);margin:-8px 0 16px;">${lv.stocks}</p>
+      <button class="btn full" onclick="this.closest('.rankup-overlay').remove()">확인</button>
+    </div>`;
+  $('app').appendChild(el);
+  confetti();
+}
+
 function checkRankUp(){
   const pct = totalReturn().pct;
   const tier = getRankTier(pct);
@@ -1197,6 +1310,7 @@ function initState(name){
     unlockedStocks:[],
     transactions:[],
     quizHistory:[],
+    xp:0,
     prices:{},
     lastRankLabel:'브론즈',
     achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
@@ -1313,6 +1427,13 @@ function renderHome(){
   const tier = getRankTier(r.pct);
   const rb = $('home-rank-badge');
   rb.textContent = `${tier.icon} ${tier.label}`;
+
+  // XP badge
+  const lv = getCurrentLevel();
+  const nextLv = getNextLevel();
+  const xp = state.xp || 0;
+  const xpBadge = $('home-xp-badge');
+  if(xpBadge) xpBadge.textContent = `${lv.icon} Lv.${lv.level} ${lv.label} · ${xp} XP`;
 
   // Mission
   const goal = 3;
@@ -1537,6 +1658,7 @@ function onQuizAnswer(idx){
     // 퀴즈 정답 보너스 +5만원
     state.cash += 50000;
     state.totalBonusEarned = (state.totalBonusEarned||0) + 50000;
+    gainXP(100);
     saveState();
     setTimeout(()=>{
       confetti();
@@ -1642,7 +1764,10 @@ function renderInvest(){
   let list = STOCKS;
   if(investFilter==='hold') list = STOCKS.filter(s=>state.holdings[s.code]?.qty>0);
   else if(investFilter==='unlock') list = STOCKS.filter(s=>state.unlockedStocks.includes(s.code));
-  else if(investFilter==='lock')   list = STOCKS.filter(s=>!state.unlockedStocks.includes(s.code));
+  else if(investFilter==='lock'){
+    const userLv = getCurrentLevel().level;
+    list = STOCKS.filter(s=>s.level > userLv || !state.unlockedStocks.includes(s.code));
+  }
 
   if(list.length===0){
     grid.style.display='block';
@@ -1652,25 +1777,39 @@ function renderInvest(){
   grid.style.display='grid';
 
   list.forEach(s=>{
-    const unlocked = state.unlockedStocks.includes(s.code);
+    const userLv = getCurrentLevel().level;
+    const levelLocked = s.level > userLv;
+    const quizLocked = !state.unlockedStocks.includes(s.code);
     const ch = getChange(s.code);
-    const cls = unlocked ? '' : 'locked';
     const card = document.createElement('div');
-    card.className = `stock-card ${cls}`;
-    if(unlocked){
+
+    if(levelLocked){
+      // 레벨 잠금
+      card.className = 'stock-card locked';
       card.innerHTML = `
-        <div class="name">${s.name}</div>
+        <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        <div class="name">${s.flag ? s.flag+' ' : ''}${s.name}</div>
+        <div class="sector">${s.sector}</div>
+        <div class="price num" style="color:var(--text-3);">- - - -</div>
+        <div style="margin-top:8px;background:var(--primary-soft);color:var(--primary);border-radius:8px;padding:6px;font-size:11px;font-weight:700;text-align:center;">Lv.${s.level} ${LEVEL_TIERS.find(t=>t.level===s.level)?.label} 해금</div>`;
+    } else if(quizLocked){
+      // 퀴즈 잠금
+      card.className = 'stock-card locked';
+      card.innerHTML = `
+        <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        <div class="name">${s.flag ? s.flag+' ' : ''}${s.name}</div>
+        <div class="sector">${s.sector}</div>
+        <div class="price num" style="color:var(--text-3);">- - - -</div>
+        <button class="mini-btn" onclick="event.stopPropagation();startQuiz('${s.code}')">퀴즈 풀기</button>`;
+    } else {
+      // 거래 가능
+      card.className = 'stock-card';
+      card.innerHTML = `
+        <div class="name">${s.flag ? s.flag+' ' : ''}${s.name}</div>
         <div class="sector">${s.sector}</div>
         <div class="price num">${fmtKRW(getPrice(s.code))}</div>
         <div class="change ${ch.isUp?'up-text':'down-text'}">${ch.isUp?'▲':'▼'} ${fmtSign(ch.diff)} (${ch.pct.toFixed(2)}%)</div>`;
       card.addEventListener('click', ()=>go('detail',{code:s.code}));
-    } else {
-      card.innerHTML = `
-        <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-        <div class="name">${s.name}</div>
-        <div class="sector">${s.sector}</div>
-        <div class="price num" style="color:var(--text-3);">- - - -</div>
-        <button class="mini-btn" onclick="event.stopPropagation();startQuiz('${s.code}')">퀴즈 풀기</button>`;
     }
     grid.appendChild(card);
   });
@@ -1985,6 +2124,7 @@ function doTrade(mode, code, qty){
     timestamp:new Date().toISOString()
   });
   saveState();
+  gainXP(30);
   closeSheet();
   checkRankUp();
 
@@ -2022,6 +2162,29 @@ function renderMy(){
   rEl.textContent = `${fmtSign(r.diff)}원 (${r.pct>=0?'+':''}${r.pct.toFixed(2)}%)`;
   rEl.className = `num ${r.diff>=0?'up-text':'down-text'}`;
   rEl.style.fontWeight = '700';
+
+  // Level card
+  const lv = getCurrentLevel();
+  const nextLvMy = getNextLevel();
+  const xpMy = state.xp || 0;
+  let lvBarPct = 100;
+  if(nextLvMy){
+    const span = nextLvMy.minXp - lv.minXp;
+    const prog = xpMy - lv.minXp;
+    lvBarPct = Math.min(100, Math.max(0, (prog/span)*100));
+  }
+  const lvCardEl = $('my-level-card');
+  if(lvCardEl){
+    lvCardEl.innerHTML = `
+      <div class="tier-card" style="background:${lv.bg};color:${lv.color};margin-top:0;margin-bottom:0;">
+        <div class="tier-icon">${lv.icon}</div>
+        <div class="tier-info" style="color:${lv.color};">
+          <div class="tier-label">Lv.${lv.level} ${lv.label}</div>
+          <div class="tier-sub">${nextLvMy ? `다음: ${nextLvMy.icon}Lv.${nextLvMy.level} ${nextLvMy.label} (${nextLvMy.minXp - xpMy} XP 남음)` : '최고 레벨 달성! 🎉'}</div>
+          <div class="tier-bar"><div class="tier-bar-fill" style="width:${lvBarPct}%;background:${lv.color};opacity:0.6;"></div></div>
+        </div>
+      </div>`;
+  }
 
   // Tier card
   const tier = getRankTier(r.pct);
