@@ -1199,7 +1199,7 @@ function saveState(){
 function savePlayerSnapshot(){
   // 자신의 스냅샷만 로컬에 백업 (친구 코드 생성용)
   try{
-    const snap = { n:state.user.name, t:Math.round(totalAsset()), r:parseFloat(totalReturn().pct.toFixed(2)), j:state.user.joinedAt };
+    const snap = { n:state.user.name, t:Math.round(totalAsset()), r:parseFloat(investReturn().pct.toFixed(2)), j:state.user.joinedAt };
     localStorage.setItem(PLAYERS_KEY+'_me', JSON.stringify(snap));
   }catch(e){}
 }
@@ -1211,13 +1211,35 @@ function myFriendCode(){
   try{
     const snap = JSON.parse(localStorage.getItem(PLAYERS_KEY+'_me')||'null');
     if(!snap) return null;
-    return 'TV:' + btoa(unescape(encodeURIComponent(JSON.stringify(snap)))).replace(/=/g,'');
+    // Compact format: name\ttotalAsset\treturnPct  → UTF-8 bytes → base64url
+    const str = `${snap.n}\t${snap.t}\t${parseFloat(snap.r).toFixed(2)}`;
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    bytes.forEach(b => bin += String.fromCharCode(b));
+    return 'TV:' + btoa(bin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
   }catch(e){ return null; }
 }
 
 function importFriendCode(rawCode){
   try{
     const code = rawCode.trim().replace(/^TV:/,'');
+    // Try new compact format first
+    try{
+      const b64 = code.replace(/-/g,'+').replace(/_/g,'/');
+      const pad = b64 + '=='.slice(0,(4-b64.length%4)%4);
+      const bytes = Uint8Array.from(atob(pad), c=>c.charCodeAt(0));
+      const str = new TextDecoder().decode(bytes);
+      if(str.includes('\t')){
+        const [n, t, r] = str.split('\t');
+        if(!n || isNaN(Number(t))) throw 'bad';
+        if(n === state.user.name){ toast('내 코드는 추가할 수 없어요'); return null; }
+        const friends = JSON.parse(localStorage.getItem(FRIENDS_KEY)||'{}');
+        friends[n] = { name:n, totalAsset:parseInt(t), returnPct:parseFloat(r), addedAt:Date.now() };
+        localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+        return n;
+      }
+    }catch(e2){}
+    // Fallback: old JSON format
     const data = JSON.parse(decodeURIComponent(escape(atob(code))));
     if(!data.n || typeof data.t !== 'number') throw 'bad';
     if(data.n === state.user.name){ toast('내 코드는 추가할 수 없어요'); return null; }
@@ -1233,7 +1255,7 @@ function getFriends(){
 }
 
 function getLeaderboard(){
-  const me = { name:state.user.name, totalAsset:totalAsset(), returnPct:totalReturn().pct };
+  const me = { name:state.user.name, totalAsset:totalAsset(), returnPct:investReturn().pct };
   return [me, ...getFriends()].sort((a,b)=>b.totalAsset-a.totalAsset);
 }
 
