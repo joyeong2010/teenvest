@@ -659,7 +659,6 @@
         <div class="delta num" id="home-delta">+0원 (0.00%)</div>
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0;">
           <div class="rank-badge" id="home-rank-badge">🥉 브론즈</div>
-          <div class="rank-badge" id="home-xp-badge" style="margin-left:6px;">🌱 Lv.1 · 0 XP</div>
         </div>
       </div>
 
@@ -809,7 +808,6 @@
         </div>
       </div>
 
-      <div id="my-level-card"></div>
       <div id="my-tier-card"></div>
 
       <h2 class="h2" style="margin-top:24px;">🎁 보너스 현황</h2>
@@ -895,13 +893,16 @@ const INITIAL_CASH = 3000000;
 
 /* ── Rank tiers (return %) ── */
 const RANK_TIERS = [
-  { min:-Infinity, label:'브론즈', icon:'🥉', color:'#C2410C', bg:'#FFF7ED', next: 0   },
-  { min:0,         label:'실버',   icon:'🥈', color:'#6B7280', bg:'#F3F4F6', next: 3   },
-  { min:3,         label:'골드',   icon:'🥇', color:'#B98800', bg:'#FFF5D6', next: 10  },
-  { min:10,        label:'플래티넘',icon:'💎', color:'#0284C7', bg:'#E0F2FE', next: 25  },
-  { min:25,        label:'다이아', icon:'💠', color:'#7C3AED', bg:'#EDE9FE', next: 50  },
-  { min:50,        label:'마스터', icon:'🏆', color:'#B98800', bg:'#FFF5D6', next: null},
+  { min:-Infinity, label:'아이언',   icon:'⚙️',  color:'#6B7280', bg:'#F3F4F6', next:0    },
+  { min:0,         label:'브론즈',   icon:'🥉',  color:'#C2410C', bg:'#FFF7ED', next:3    },
+  { min:3,         label:'실버',     icon:'🥈',  color:'#6B7280', bg:'#F0F0F0', next:8    },
+  { min:8,         label:'골드',     icon:'🥇',  color:'#B98800', bg:'#FFF5D6', next:15   },
+  { min:15,        label:'플래티넘', icon:'💎',  color:'#0284C7', bg:'#E0F2FE', next:25   },
+  { min:25,        label:'에메랄드', icon:'🟢',  color:'#059669', bg:'#ECFDF5', next:40   },
+  { min:40,        label:'다이아',   icon:'💠',  color:'#7C3AED', bg:'#EDE9FE', next:60   },
+  { min:60,        label:'마스터',   icon:'🏆',  color:'#B98800', bg:'#FFF9E6', next:null },
 ];
+const RANK_ORDER = RANK_TIERS.map(t=>t.label);
 
 function getRankTier(pct){
   let t = RANK_TIERS[0];
@@ -909,45 +910,32 @@ function getRankTier(pct){
   return t;
 }
 
-const LEVEL_TIERS = [
-  { level:1, minXp:0,    label:'입문',   icon:'🌱', color:'#16A34A', bg:'#F0FDF4', stocks:'기본 한국 주식 3종목' },
-  { level:2, minXp:300,  label:'초급',   icon:'📈', color:'#3182F6', bg:'#EFF6FF', stocks:'중가 한국 주식 4종목 추가' },
-  { level:3, minXp:800,  label:'중급',   icon:'🚀', color:'#7C3AED', bg:'#EDE9FE', stocks:'고가 주식 + 미국 주식 6종목 추가' },
-  { level:4, minXp:1800, label:'고급',   icon:'💎', color:'#B98800', bg:'#FFF5D6', stocks:'엔비디아·버크셔 등 최고가 2종목 추가' },
-];
-
-function getCurrentLevel(){
-  const xp = state.xp || 0;
-  let t = LEVEL_TIERS[0];
-  for(const r of LEVEL_TIERS){ if(xp >= r.minXp) t = r; }
-  return t;
-}
-
-function getNextLevel(){
-  const cur = getCurrentLevel();
-  return LEVEL_TIERS.find(t => t.level === cur.level + 1) || null;
+function isRankLocked(stock){
+  const userIdx = RANK_ORDER.indexOf(getRankTier(investReturn().pct).label);
+  const stockIdx = RANK_ORDER.indexOf(stock.rank);
+  return stockIdx > userIdx;
 }
 
 const STOCKS = [
-  { code:'005930', name:'삼성전자',    sector:'반도체', price:71000,  level:1, about:'한국을 대표하는 글로벌 반도체·전자 기업. 메모리 반도체와 스마트폰에서 세계 1위.' },
-  { code:'035720', name:'카카오',      sector:'IT',     price:52000,  level:1, about:'국민 메신저 카카오톡 운영사. 핀테크·콘텐츠·모빌리티 등 다양한 사업 영위.' },
-  { code:'105560', name:'KB금융',      sector:'금융',   price:76000,  level:1, about:'국내 4대 금융지주 중 하나. 국민은행을 중심으로 한 종합 금융그룹.' },
-  { code:'035420', name:'NAVER',       sector:'IT',     price:215000, level:2, about:'한국 최대 포털 및 콘텐츠 플랫폼 기업. AI·웹툰·커머스로 사업 확장 중.' },
-  { code:'005380', name:'현대차',      sector:'자동차', price:245000, level:2, about:'한국 최대 완성차 제조사. 전기차 아이오닉 시리즈로 글로벌 EV 시장 공략.' },
-  { code:'000660', name:'SK하이닉스',  sector:'반도체', price:195000, level:2, about:'세계 2위 메모리 반도체 기업. HBM(고대역폭 메모리) 시장 선두주자.' },
-  { code:'068270', name:'셀트리온',    sector:'바이오', price:178000, level:2, about:'국내 대표 바이오시밀러 기업. 항체 의약품 분야 글로벌 경쟁력 보유.' },
-  { code:'373220', name:'LG에너지솔루션', sector:'배터리', price:405000, level:3, about:'세계 1·2위를 다투는 전기차 배터리 제조사. 글로벌 OEM 다수에 공급.' },
-  { code:'005490', name:'POSCO홀딩스', sector:'철강',   price:385000, level:3, about:'세계적 철강 기업. 리튬·니켈 등 2차전지 소재 사업으로 사업 다각화.' },
-  { code:'207940', name:'삼성바이오로직스', sector:'바이오', price:925000, level:3, about:'세계 최대 바이오의약품 위탁생산(CMO) 기업. 글로벌 제약사 다수와 계약.' },
-  { code:'TSLA', name:'테슬라', sector:'전기차', price:255000, level:3, flag:'🇺🇸',
+  { code:'005930', name:'삼성전자',    sector:'반도체', price:71000,  rank:'아이언', about:'한국을 대표하는 글로벌 반도체·전자 기업. 메모리 반도체와 스마트폰에서 세계 1위.' },
+  { code:'035720', name:'카카오',      sector:'IT',     price:52000,  rank:'아이언', about:'국민 메신저 카카오톡 운영사. 핀테크·콘텐츠·모빌리티 등 다양한 사업 영위.' },
+  { code:'105560', name:'KB금융',      sector:'금융',   price:76000,  rank:'아이언', about:'국내 4대 금융지주 중 하나. 국민은행을 중심으로 한 종합 금융그룹.' },
+  { code:'035420', name:'NAVER',       sector:'IT',     price:215000, rank:'실버', about:'한국 최대 포털 및 콘텐츠 플랫폼 기업. AI·웹툰·커머스로 사업 확장 중.' },
+  { code:'005380', name:'현대차',      sector:'자동차', price:245000, rank:'실버', about:'한국 최대 완성차 제조사. 전기차 아이오닉 시리즈로 글로벌 EV 시장 공략.' },
+  { code:'000660', name:'SK하이닉스',  sector:'반도체', price:195000, rank:'실버', about:'세계 2위 메모리 반도체 기업. HBM(고대역폭 메모리) 시장 선두주자.' },
+  { code:'068270', name:'셀트리온',    sector:'바이오', price:178000, rank:'브론즈', about:'국내 대표 바이오시밀러 기업. 항체 의약품 분야 글로벌 경쟁력 보유.' },
+  { code:'373220', name:'LG에너지솔루션', sector:'배터리', price:405000, rank:'골드', about:'세계 1·2위를 다투는 전기차 배터리 제조사. 글로벌 OEM 다수에 공급.' },
+  { code:'005490', name:'POSCO홀딩스', sector:'철강',   price:385000, rank:'골드', about:'세계적 철강 기업. 리튬·니켈 등 2차전지 소재 사업으로 사업 다각화.' },
+  { code:'TSLA', name:'테슬라', sector:'전기차', price:255000, rank:'골드', flag:'🇺🇸',
     about:'일론 머스크가 이끄는 세계 1위 전기차 기업. 모델 Y·사이버트럭으로 글로벌 EV 시장을 선도.' },
-  { code:'AAPL', name:'애플', sector:'IT', price:270000, level:3, flag:'🇺🇸',
+  { code:'AAPL', name:'애플', sector:'IT', price:270000, rank:'플래티넘', flag:'🇺🇸',
     about:'아이폰·맥·애플워치로 유명한 세계 최대 IT 기업. 애플 인텔리전스 AI 기능으로 재도약 중.' },
-  { code:'MSFT', name:'마이크로소프트', sector:'IT', price:570000, level:3, flag:'🇺🇸',
+  { code:'MSFT', name:'마이크로소프트', sector:'IT', price:570000, rank:'플래티넘', flag:'🇺🇸',
     about:'윈도우·오피스·애저 클라우드를 운영하는 글로벌 소프트웨어 제국. OpenAI 최대 투자사.' },
-  { code:'NVDA', name:'엔비디아', sector:'반도체', price:870000, level:4, flag:'🇺🇸',
+  { code:'207940', name:'삼성바이오로직스', sector:'바이오', price:925000, rank:'에메랄드', about:'세계 최대 바이오의약품 위탁생산(CMO) 기업. 글로벌 제약사 다수와 계약.' },
+  { code:'NVDA', name:'엔비디아', sector:'반도체', price:870000, rank:'다이아', flag:'🇺🇸',
     about:'AI 가속기 GPU 시장 1위. H100·H200 칩으로 전 세계 AI 데이터센터를 장악한 반도체 공룡.' },
-  { code:'BRK-B', name:'버크셔 해서웨이', sector:'금융', price:630000, level:4, flag:'🇺🇸',
+  { code:'BRK-B', name:'버크셔 해서웨이', sector:'금융', price:630000, rank:'에메랄드', flag:'🇺🇸',
     about:'워런 버핏이 이끄는 전설적 투자 지주회사. 코카콜라·애플·아메리칸익스프레스 등을 보유.' },
 ];
 
@@ -1270,28 +1258,6 @@ function awardBonus(amount, reason){
   }, 300);
 }
 
-function gainXP(amount){
-  const prevLv = getCurrentLevel();
-  state.xp = (state.xp || 0) + amount;
-  saveState();
-  const newLv = getCurrentLevel();
-  if(newLv.level > prevLv.level) showLevelUpOverlay(newLv);
-}
-
-function showLevelUpOverlay(lv){
-  const el = document.createElement('div');
-  el.className = 'rankup-overlay';
-  el.innerHTML = `
-    <div class="rankup-box">
-      <div class="rank-emoji">${lv.icon}</div>
-      <h2>레벨 업!</h2>
-      <p><strong>Lv.${lv.level} ${lv.label}</strong> 달성! 🎉</p>
-      <p style="font-size:13px;color:var(--text-2);margin:-8px 0 16px;">${lv.stocks}</p>
-      <button class="btn full" onclick="this.closest('.rankup-overlay').remove()">확인</button>
-    </div>`;
-  $('app').appendChild(el);
-  confetti();
-}
 
 function checkRankUp(){
   const pct = investReturn().pct;
@@ -1456,12 +1422,6 @@ function renderHome(){
   const rb = $('home-rank-badge');
   rb.textContent = `${tier.icon} ${tier.label}`;
 
-  // XP badge
-  const lv = getCurrentLevel();
-  const nextLv = getNextLevel();
-  const xp = state.xp || 0;
-  const xpBadge = $('home-xp-badge');
-  if(xpBadge) xpBadge.textContent = `${lv.icon} Lv.${lv.level} ${lv.label} · ${xp} XP`;
 
   // Mission
   const goal = 3;
@@ -1686,7 +1646,6 @@ function onQuizAnswer(idx){
     // 퀴즈 정답 보너스 +5만원
     state.cash += 50000;
     state.totalBonusEarned = (state.totalBonusEarned||0) + 50000;
-    gainXP(100);
     saveState();
     setTimeout(()=>{
       confetti();
@@ -1793,8 +1752,7 @@ function renderInvest(){
   if(investFilter==='hold') list = STOCKS.filter(s=>state.holdings[s.code]?.qty>0);
   else if(investFilter==='unlock') list = STOCKS.filter(s=>state.unlockedStocks.includes(s.code));
   else if(investFilter==='lock'){
-    const userLv = getCurrentLevel().level;
-    list = STOCKS.filter(s=>s.level > userLv || !state.unlockedStocks.includes(s.code));
+    list = STOCKS.filter(s=>isRankLocked(s) || !state.unlockedStocks.includes(s.code));
   }
 
   if(list.length===0){
@@ -1805,21 +1763,21 @@ function renderInvest(){
   grid.style.display='grid';
 
   list.forEach(s=>{
-    const userLv = getCurrentLevel().level;
-    const levelLocked = s.level > userLv;
-    const quizLocked = !state.unlockedStocks.includes(s.code);
+    const rankLocked = isRankLocked(s);
+    const quizLocked = !rankLocked && !state.unlockedStocks.includes(s.code);
     const ch = getChange(s.code);
     const card = document.createElement('div');
 
-    if(levelLocked){
-      // 레벨 잠금
+    if(rankLocked){
+      // 등급 잠금
+      const reqTier = RANK_TIERS.find(t=>t.label===s.rank);
       card.className = 'stock-card locked';
       card.innerHTML = `
         <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
         <div class="name">${s.flag ? s.flag+' ' : ''}${s.name}</div>
         <div class="sector">${s.sector}</div>
         <div class="price num" style="color:var(--text-3);">- - - -</div>
-        <div style="margin-top:8px;background:var(--primary-soft);color:var(--primary);border-radius:8px;padding:6px;font-size:11px;font-weight:700;text-align:center;">Lv.${s.level} ${LEVEL_TIERS.find(t=>t.level===s.level)?.label} 해금</div>`;
+        <div style="margin-top:8px;background:${reqTier?.bg||'#EFF6FF'};color:${reqTier?.color||'#3182F6'};border-radius:8px;padding:6px;font-size:11px;font-weight:700;text-align:center;">${reqTier?.icon||''} ${s.rank} 등급 해금</div>`;
     } else if(quizLocked){
       // 퀴즈 잠금
       card.className = 'stock-card locked';
@@ -2152,7 +2110,6 @@ function doTrade(mode, code, qty){
     timestamp:new Date().toISOString()
   });
   saveState();
-  gainXP(30);
   closeSheet();
   checkRankUp();
 
@@ -2191,30 +2148,7 @@ function renderMy(){
   rEl.className = `num ${r.diff>=0?'up-text':'down-text'}`;
   rEl.style.fontWeight = '700';
 
-  // Level card
-  const lv = getCurrentLevel();
-  const nextLvMy = getNextLevel();
-  const xpMy = state.xp || 0;
-  let lvBarPct = 100;
-  if(nextLvMy){
-    const span = nextLvMy.minXp - lv.minXp;
-    const prog = xpMy - lv.minXp;
-    lvBarPct = Math.min(100, Math.max(0, (prog/span)*100));
-  }
-  const lvCardEl = $('my-level-card');
-  if(lvCardEl){
-    lvCardEl.innerHTML = `
-      <div class="tier-card" style="background:${lv.bg};color:${lv.color};margin-top:0;margin-bottom:0;">
-        <div class="tier-icon">${lv.icon}</div>
-        <div class="tier-info" style="color:${lv.color};">
-          <div class="tier-label">Lv.${lv.level} ${lv.label}</div>
-          <div class="tier-sub">${nextLvMy ? `다음: ${nextLvMy.icon}Lv.${nextLvMy.level} ${nextLvMy.label} (${nextLvMy.minXp - xpMy} XP 남음)` : '최고 레벨 달성! 🎉'}</div>
-          <div class="tier-bar"><div class="tier-bar-fill" style="width:${lvBarPct}%;background:${lv.color};opacity:0.6;"></div></div>
-        </div>
-      </div>`;
-  }
-
-  // Tier card (based on actual investment return, excluding bonuses)
+  // Rank tier card
   const ir = investReturn();
   const tier = getRankTier(ir.pct);
   const tierIdx = RANK_TIERS.findIndex(t=>t.label===tier.label);
@@ -2225,12 +2159,17 @@ function renderMy(){
     const prog = ir.pct - tier.min;
     barPct = Math.min(100, Math.max(0, (prog/span)*100));
   }
+  // 다음 등급에서 해금되는 종목
+  const nextUnlockStocks = nextTier ? STOCKS.filter(s=>s.rank===nextTier.label).map(s=>`${s.flag||''}${s.name}`).join(', ') : '';
+  const nextSubText = nextTier
+    ? `다음: ${nextTier.icon}${nextTier.label} (${(nextTier.min-ir.pct).toFixed(1)}% 남음)${nextUnlockStocks ? ' · 해금: '+nextUnlockStocks : ''}`
+    : '최고 등급 달성! 🎉';
   $('my-tier-card').innerHTML = `
     <div class="tier-card" style="background:${tier.bg};color:${tier.color};">
       <div class="tier-icon">${tier.icon}</div>
       <div class="tier-info" style="color:${tier.color};">
-        <div class="tier-label">${tier.label}</div>
-        <div class="tier-sub">${nextTier?`다음: ${nextTier.icon}${nextTier.label} (+${nextTier.min}%)까지 ${(nextTier.min-ir.pct).toFixed(1)}% 남음`:'최고 등급 달성! 🎉'}</div>
+        <div class="tier-label">${tier.icon} ${tier.label}</div>
+        <div class="tier-sub">${nextSubText}</div>
         <div class="tier-bar"><div class="tier-bar-fill" style="width:${barPct}%;background:${tier.color};opacity:0.6;"></div></div>
       </div>
     </div>`;
