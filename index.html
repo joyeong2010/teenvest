@@ -1403,27 +1403,45 @@ function myFriendCode(){
   try{
     const snap = JSON.parse(localStorage.getItem(PLAYERS_KEY+'_me')||'null');
     if(!snap) return null;
-    // Compact format: name\ttotalAsset\treturnPct  → UTF-8 bytes → base64url
-    const str = `${snap.n}\t${snap.t}\t${parseFloat(snap.r).toFixed(2)}`;
-    const bytes = new TextEncoder().encode(str);
-    let bin = '';
-    bytes.forEach(b => bin += String.fromCharCode(b));
-    return 'TV:' + btoa(bin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const nameBytes = new TextEncoder().encode(snap.n);
+    let nameBin = '';
+    nameBytes.forEach(b => nameBin += String.fromCharCode(b));
+    const namePart = btoa(nameBin).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const assetPart = Math.max(0, Math.round(snap.t)).toString(36);
+    const pctPart   = Math.round((parseFloat(snap.r) + 200) * 100).toString(36);
+    return 'TV:' + namePart + '~' + assetPart + '~' + pctPart;
   }catch(e){ return null; }
 }
 
 function importFriendCode(rawCode){
   try{
     const code = rawCode.trim().replace(/^TV:/,'');
-    // Try new compact format first
+    if(code.includes('~')){
+      const parts = code.split('~');
+      if(parts.length===3){
+        const [namePart, assetStr, pctStr] = parts;
+        const b64 = namePart.replace(/-/g,'+').replace(/_/g,'/');
+        const pad = b64 + '=='.slice(0,(4-b64.length%4)%4);
+        const bytes = Uint8Array.from(atob(pad), c=>c.charCodeAt(0));
+        const n = new TextDecoder().decode(bytes);
+        const t = parseInt(assetStr, 36);
+        const r = (parseInt(pctStr, 36) / 100) - 200;
+        if(!n || isNaN(t) || isNaN(r)) throw 'bad';
+        if(n === state.user.name){ toast('내 코드는 추가할 수 없어요'); return null; }
+        const friends = JSON.parse(localStorage.getItem(FRIENDS_KEY)||'{}');
+        friends[n] = { name:n, totalAsset:t, returnPct:parseFloat(r.toFixed(2)), addedAt:Date.now() };
+        localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+        return n;
+      }
+    }
     try{
       const b64 = code.replace(/-/g,'+').replace(/_/g,'/');
-      const pad = b64 + '=='.slice(0,(4-b64.length%4)%4);
-      const bytes = Uint8Array.from(atob(pad), c=>c.charCodeAt(0));
-      const str = new TextDecoder().decode(bytes);
+      const pad2 = b64 + '=='.slice(0,(4-b64.length%4)%4);
+      const bytes2 = Uint8Array.from(atob(pad2), c=>c.charCodeAt(0));
+      const str = new TextDecoder().decode(bytes2);
       if(str.includes('\t')){
         const [n, t, r] = str.split('\t');
-        if(!n || isNaN(Number(t))) throw 'bad';
+        if(!n || isNaN(Number(t))) throw 'bad2';
         if(n === state.user.name){ toast('내 코드는 추가할 수 없어요'); return null; }
         const friends = JSON.parse(localStorage.getItem(FRIENDS_KEY)||'{}');
         friends[n] = { name:n, totalAsset:parseInt(t), returnPct:parseFloat(r), addedAt:Date.now() };
@@ -1431,7 +1449,6 @@ function importFriendCode(rawCode){
         return n;
       }
     }catch(e2){}
-    // Fallback: old JSON format
     const data = JSON.parse(decodeURIComponent(escape(atob(code))));
     if(!data.n || typeof data.t !== 'number') throw 'bad';
     if(data.n === state.user.name){ toast('내 코드는 추가할 수 없어요'); return null; }
@@ -1449,6 +1466,18 @@ function getFriends(){
 function getLeaderboard(){
   const me = { name:state.user.name, totalAsset:totalAsset(), returnPct:investReturn().pct };
   return [me, ...getFriends()].sort((a,b)=>b.totalAsset-a.totalAsset);
+}
+
+/* ── Daily re-quiz helpers ── */
+function lastCorrectQuizTime(code){
+  const attempts = (state.quizHistory||[]).filter(q=>q.stockCode===code && q.correct);
+  if(!attempts.length) return null;
+  return new Date(attempts[attempts.length-1].timestamp);
+}
+function canRequiz(code){
+  const last = lastCorrectQuizTime(code);
+  if(!last) return false;
+  return Date.now() - last.getTime() > 24*60*60*1000;
 }
 
 /* ── Rank-up detection & overlay ── */
@@ -1818,6 +1847,20 @@ function renderQuizHome(){
         </div>`).join('')}`;
   }).join('');
 
+  const requizable = STOCKS.filter(s=>state.unlockedStocks.includes(s.code) && !isRankLocked(s) && canRequiz(s.code));
+  const requizSection = requizable.length===0 ? '' : `
+    <h2 class="h2" style="margin-top:24px;">🔄 오늘의 재도전</h2>
+    <div class="caption" style="margin-bottom:12px;">24시간이 지난 종목을 다시 풀 수 있어요 · 정답 시 +1만원</div>
+    ${requizable.map(s=>`
+      <div class="card" style="display:flex;align-items:center;gap:14px;cursor:pointer;" onclick="startRequiz('${s.code}')">
+        <div style="width:44px;height:44px;border-radius:12px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;font-size:20px;">🔄</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;">${s.flag||''}${s.name}</div>
+          <div class="caption">${s.sector}</div>
+        </div>
+        <button class="btn sm secondary">재도전</button>
+      </div>`).join('')}`;
+
   body.innerHTML = `
     <div class="card" style="background:linear-gradient(135deg,#FFC233 0%,#FFA000 100%);color:#fff;">
       <div style="font-size:14px;opacity:0.9;margin-bottom:4px;">🎯 학습으로 해금</div>
@@ -1829,6 +1872,7 @@ function renderQuizHome(){
       ? `<div class="empty"><div class="ico">🎉</div><div class="msg">모든 종목을 해금했어요!</div></div>`
       : quizzableSection}
     ${lockedSection}
+    ${requizSection}
   `;
 }
 
@@ -1844,6 +1888,12 @@ function startQuiz(code){
   setTimeout(()=>{ tutCheck('quiz-start'); ftutCheck('ftut-quiz-start'); },300);
 }
 window.startQuiz = startQuiz;
+
+function startRequiz(code){
+  currentQuiz = { code, answered:false, isRequiz:true };
+  go('quiz');
+}
+window.startRequiz = startRequiz;
 
 function renderQuizQ(){
   const { code, answered } = currentQuiz;
@@ -1909,14 +1959,19 @@ function onQuizAnswer(idx){
     if(!state.unlockedStocks.includes(currentQuiz.code)){
       state.unlockedStocks.push(currentQuiz.code);
     }
-    // 퀴즈 정답 보너스 +5만원
-    state.cash += 50000;
-    state.totalBonusEarned = (state.totalBonusEarned||0) + 50000;
+    const isRQ = currentQuiz.isRequiz;
+    const bonus = isRQ ? 10000 : 50000;
+    state.cash += bonus;
+    state.totalBonusEarned = (state.totalBonusEarned||0) + bonus;
     saveState();
     setTimeout(()=>{
       confetti();
       const s = getStock(currentQuiz.code);
-      toast(`🎉 ${s.name} 해금 + 정답 보너스 +5만원!`);
+      if(isRQ){
+        toast(`🔄 재도전 성공! +1만원 보너스`);
+      } else {
+        toast(`🎉 ${s.name} 해금 + 정답 보너스 +5만원!`);
+      }
     }, 200);
     // 일일 미션 달성 체크 (오늘 3문제 정답)
     const todayStr = new Date().toDateString();
@@ -2791,7 +2846,7 @@ function tickPrices(){
     const p = state.prices[s.code];
     if(!p) return;
     p.prev = p.current;
-    const drift = (Math.random()-0.5) * 0.006; // ±0.3%
+    const drift = (Math.random()-0.5) * 0.002; // ±0.1%
     p.current = Math.max(100, Math.round(p.current * (1 + drift)));
   });
   saveState();
@@ -2970,7 +3025,7 @@ function boot(){
   } else {
     showOnboard();
   }
-  setInterval(tickPrices, 3000);
+  setInterval(tickPrices, 60000);
 }
 
 document.addEventListener('keydown', e=>{
