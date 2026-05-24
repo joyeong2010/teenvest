@@ -926,27 +926,27 @@ const STORAGE_KEY = 'teenvest_v1';
 const PLAYERS_KEY  = 'teenvest_players_v1';
 const INITIAL_CASH = 3000000;
 
-/* ── Rank tiers (return %) ── */
+/* ── Rank tiers (보유 자산 기준, 원) ── */
 const RANK_TIERS = [
-  { min:-Infinity, label:'아이언',   icon:'⚙️',  color:'#6B7280', bg:'#F3F4F6', next:0    },
-  { min:0,         label:'브론즈',   icon:'🥉',  color:'#C2410C', bg:'#FFF7ED', next:3    },
-  { min:3,         label:'실버',     icon:'🥈',  color:'#6B7280', bg:'#F0F0F0', next:8    },
-  { min:8,         label:'골드',     icon:'🥇',  color:'#B98800', bg:'#FFF5D6', next:15   },
-  { min:15,        label:'플래티넘', icon:'💎',  color:'#0284C7', bg:'#E0F2FE', next:25   },
-  { min:25,        label:'에메랄드', icon:'🟢',  color:'#059669', bg:'#ECFDF5', next:40   },
-  { min:40,        label:'다이아',   icon:'💠',  color:'#7C3AED', bg:'#EDE9FE', next:60   },
-  { min:60,        label:'마스터',   icon:'🏆',  color:'#B98800', bg:'#FFF9E6', next:null },
+  { min:0,          label:'아이언',   icon:'⚙️',  color:'#6B7280', bg:'#F3F4F6', next:3300000  },
+  { min:3300000,    label:'브론즈',   icon:'🥉',  color:'#C2410C', bg:'#FFF7ED', next:3700000  },
+  { min:3700000,    label:'실버',     icon:'🥈',  color:'#6B7280', bg:'#F0F0F0', next:4500000  },
+  { min:4500000,    label:'골드',     icon:'🥇',  color:'#B98800', bg:'#FFF5D6', next:6000000  },
+  { min:6000000,    label:'플래티넘', icon:'💎',  color:'#0284C7', bg:'#E0F2FE', next:9000000  },
+  { min:9000000,    label:'에메랄드', icon:'🟢',  color:'#059669', bg:'#ECFDF5', next:15000000 },
+  { min:15000000,   label:'다이아',   icon:'💠',  color:'#7C3AED', bg:'#EDE9FE', next:30000000 },
+  { min:30000000,   label:'마스터',   icon:'🏆',  color:'#B98800', bg:'#FFF9E6', next:null     },
 ];
 const RANK_ORDER = RANK_TIERS.map(t=>t.label);
 
-function getRankTier(pct){
+function getRankTier(asset){
   let t = RANK_TIERS[0];
-  for(const r of RANK_TIERS){ if(pct >= r.min) t = r; }
+  for(const r of RANK_TIERS){ if(asset >= r.min) t = r; }
   return t;
 }
 
 function isRankLocked(stock){
-  const userIdx = RANK_ORDER.indexOf(getRankTier(investReturn().pct).label);
+  const userIdx = RANK_ORDER.indexOf(getRankTier(totalAsset()).label);
   const stockIdx = RANK_ORDER.indexOf(stock.rank);
   return stockIdx > userIdx;
 }
@@ -1493,8 +1493,8 @@ function awardBonus(amount, reason){
 
 
 function checkRankUp(){
-  const pct = investReturn().pct;
-  const tier = getRankTier(pct);
+  const asset = totalAsset();
+  const tier = getRankTier(asset);
   const prev = state.lastRankLabel;
   if(prev !== tier.label){
     const prevIdx = RANK_TIERS.findIndex(t=>t.label===prev);
@@ -1503,11 +1503,11 @@ function checkRankUp(){
     saveState();
     if(newIdx > prevIdx) showRankUpOverlay(tier);
   }
-  // 수익률 보너스
+  // 자산 달성 보너스
   if(!state.achievements) state.achievements = {};
-  if(pct >= 5  && !state.achievements.ret5)  { state.achievements.ret5  = true; awardBonus(300000,  '수익률 +5% 달성'); }
-  if(pct >= 10 && !state.achievements.ret10) { state.achievements.ret10 = true; awardBonus(500000,  '수익률 +10% 달성'); }
-  if(pct >= 20 && !state.achievements.ret20) { state.achievements.ret20 = true; awardBonus(1000000, '수익률 +20% 달성'); }
+  if(asset >= 3600000  && !state.achievements.asset360)  { state.achievements.asset360  = true; awardBonus(300000,  '보유 자산 360만원 달성'); }
+  if(asset >= 4500000  && !state.achievements.asset450)  { state.achievements.asset450  = true; awardBonus(500000,  '보유 자산 450만원 달성'); }
+  if(asset >= 6000000  && !state.achievements.asset600)  { state.achievements.asset600  = true; awardBonus(1000000, '보유 자산 600만원 달성'); }
 }
 
 function showRankUpOverlay(tier){
@@ -1671,8 +1671,8 @@ function renderHome(){
   const r = totalReturn();
   $('home-delta').textContent = `${fmtSign(r.diff)}원 (${r.pct>=0?'+':''}${r.pct.toFixed(2)}%)`;
 
-  // Rank badge (based on actual investment return, excluding bonuses)
-  const tier = getRankTier(investReturn().pct);
+  // Rank badge (보유 자산 기준)
+  const tier = getRankTier(totalAsset());
   const rb = $('home-rank-badge');
   rb.textContent = `${tier.icon} ${tier.label}`;
 
@@ -2483,21 +2483,23 @@ function renderMy(){
   rEl.className = `num ${r.diff>=0?'up-text':'down-text'}`;
   rEl.style.fontWeight = '700';
 
-  // Rank tier card
-  const ir = investReturn();
-  const tier = getRankTier(ir.pct);
+  // Rank tier card (보유 자산 기준)
+  const myAsset = totalAsset();
+  const tier = getRankTier(myAsset);
   const tierIdx = RANK_TIERS.findIndex(t=>t.label===tier.label);
   const nextTier = RANK_TIERS[tierIdx+1];
   let barPct = 100;
   if(nextTier){
     const span = nextTier.min - tier.min;
-    const prog = ir.pct - tier.min;
+    const prog = myAsset - tier.min;
     barPct = Math.min(100, Math.max(0, (prog/span)*100));
   }
   // 다음 등급에서 해금되는 종목
   const nextUnlockStocks = nextTier ? STOCKS.filter(s=>s.rank===nextTier.label).map(s=>`${s.flag||''}${s.name}`).join(', ') : '';
+  const needed = nextTier ? nextTier.min - myAsset : 0;
+  const neededStr = needed > 0 ? `${Math.ceil(needed/10000)}만원 더 모으면` : '달성!';
   const nextSubText = nextTier
-    ? `다음: ${nextTier.icon}${nextTier.label} (${(nextTier.min-ir.pct).toFixed(1)}% 남음)${nextUnlockStocks ? ' · 해금: '+nextUnlockStocks : ''}`
+    ? `다음: ${nextTier.icon}${nextTier.label} (${neededStr})${nextUnlockStocks ? ' · 해금: '+nextUnlockStocks : ''}`
     : '최고 등급 달성! 🎉';
   $('my-tier-card').innerHTML = `
     <div class="tier-card" style="background:${tier.bg};color:${tier.color};">
@@ -2518,7 +2520,7 @@ function renderMy(){
     lbEl.innerHTML = lb.map((p,i)=>{
       const isMe = p.name===state.user.name;
       const posCls = i===0?'p1':i===1?'p2':i===2?'p3':'';
-      const t2 = getRankTier(p.returnPct);
+      const t2 = getRankTier(p.totalAsset);
       const retCls = p.returnPct>=0?'up-text':'down-text';
       return `<div class="lb-item">
         <div class="lb-pos ${posCls}">${i+1}</div>
@@ -2859,7 +2861,7 @@ function tickPrices(){
     $('home-total').textContent = fmtKRW(t);
     const r = totalReturn();
     $('home-delta').textContent = `${fmtSign(r.diff)}원 (${r.pct>=0?'+':''}${r.pct.toFixed(2)}%)`;
-    const rankTier = getRankTier(investReturn().pct);
+    const rankTier = getRankTier(totalAsset());
     $('home-rank-badge').textContent = `${rankTier.icon} ${rankTier.label}`;
   } else if(id==='screen-invest'){
     renderInvest();
@@ -3025,7 +3027,7 @@ function boot(){
   } else {
     showOnboard();
   }
-  setInterval(tickPrices, 60000);
+  setInterval(tickPrices, 15000);
 }
 
 document.addEventListener('keydown', e=>{
