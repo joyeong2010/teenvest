@@ -928,16 +928,29 @@ const INITIAL_CASH = 3000000;
 
 /* ── Rank tiers (보유 자산 기준, 원) ── */
 const RANK_TIERS = [
-  { min:0,          label:'아이언',   icon:'⚙️',  color:'#6B7280', bg:'#F3F4F6', next:3300000  },
-  { min:3300000,    label:'브론즈',   icon:'🥉',  color:'#C2410C', bg:'#FFF7ED', next:3700000  },
-  { min:3700000,    label:'실버',     icon:'🥈',  color:'#6B7280', bg:'#F0F0F0', next:4500000  },
-  { min:4500000,    label:'골드',     icon:'🥇',  color:'#B98800', bg:'#FFF5D6', next:6000000  },
-  { min:6000000,    label:'플래티넘', icon:'💎',  color:'#0284C7', bg:'#E0F2FE', next:9000000  },
-  { min:9000000,    label:'에메랄드', icon:'🟢',  color:'#059669', bg:'#ECFDF5', next:15000000 },
-  { min:15000000,   label:'다이아',   icon:'💠',  color:'#7C3AED', bg:'#EDE9FE', next:30000000 },
-  { min:30000000,   label:'마스터',   icon:'🏆',  color:'#B98800', bg:'#FFF9E6', next:null     },
+  { min:0,           label:'아이언',   icon:'⚙️',  color:'#6B7280', bg:'#F3F4F6', next:3500000   },
+  { min:3500000,     label:'브론즈',   icon:'🥉',  color:'#C2410C', bg:'#FFF7ED', next:4200000   },
+  { min:4200000,     label:'실버',     icon:'🥈',  color:'#6B7280', bg:'#F0F0F0', next:6000000   },
+  { min:6000000,     label:'골드',     icon:'🥇',  color:'#B98800', bg:'#FFF5D6', next:10000000  },
+  { min:10000000,    label:'플래티넘', icon:'💎',  color:'#0284C7', bg:'#E0F2FE', next:22000000  },
+  { min:22000000,    label:'에메랄드', icon:'🟢',  color:'#059669', bg:'#ECFDF5', next:55000000  },
+  { min:55000000,    label:'다이아',   icon:'💠',  color:'#7C3AED', bg:'#EDE9FE', next:150000000 },
+  { min:150000000,   label:'마스터',   icon:'🏆',  color:'#B98800', bg:'#FFF9E6', next:null      },
 ];
 const RANK_ORDER = RANK_TIERS.map(t=>t.label);
+
+/* ── 배당 수익률 (연간 %) ── */
+const DIVIDENDS = {
+  '105560': 4.5,  // KB금융
+  '055550': 4.8,  // 신한지주
+  '017670': 5.2,  // SK텔레콤
+  '000270': 3.5,  // 기아
+  '005930': 2.5,  // 삼성전자
+  '005490': 3.2,  // POSCO홀딩스
+  'AAPL':   1.5,  // 애플
+  'MSFT':   1.8,  // 마이크로소프트
+  'JPM':    2.8,  // JP모건
+};
 
 function getRankTier(asset){
   let t = RANK_TIERS[0];
@@ -1355,10 +1368,12 @@ let state = {
   transactions:[],
   quizHistory:[],
   prices:{},
-  lastRankLabel:'브론즈',
-  achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
+  lastRankLabel:'아이언',
+  achievements:{},
   lastMissionBonus:'',
   totalBonusEarned:0,
+  totalDividendEarned:0,
+  lastDividendAt:{},
   xp:0
 };
 
@@ -1505,9 +1520,36 @@ function checkRankUp(){
   }
   // 자산 달성 보너스
   if(!state.achievements) state.achievements = {};
-  if(asset >= 3600000  && !state.achievements.asset360)  { state.achievements.asset360  = true; awardBonus(300000,  '보유 자산 360만원 달성'); }
-  if(asset >= 4500000  && !state.achievements.asset450)  { state.achievements.asset450  = true; awardBonus(500000,  '보유 자산 450만원 달성'); }
-  if(asset >= 6000000  && !state.achievements.asset600)  { state.achievements.asset600  = true; awardBonus(1000000, '보유 자산 600만원 달성'); }
+  if(asset >= 4000000   && !state.achievements.asset400)  { state.achievements.asset400  = true; awardBonus(80000,   '보유 자산 400만원 달성'); }
+  if(asset >= 6000000   && !state.achievements.asset600)  { state.achievements.asset600  = true; awardBonus(150000,  '보유 자산 600만원 달성'); }
+  if(asset >= 10000000  && !state.achievements.asset1000) { state.achievements.asset1000 = true; awardBonus(300000,  '보유 자산 1000만원 달성'); }
+  if(asset >= 22000000  && !state.achievements.asset2200) { state.achievements.asset2200 = true; awardBonus(700000,  '보유 자산 2200만원 달성'); }
+  if(asset >= 55000000  && !state.achievements.asset5500) { state.achievements.asset5500 = true; awardBonus(2000000, '보유 자산 5500만원 달성'); }
+}
+
+function checkDividends(){
+  if(!state.lastDividendAt) state.lastDividendAt = {};
+  const now = Date.now();
+  const ONE_DAY = 24*60*60*1000;
+  let paid = false;
+  STOCKS.forEach(s=>{
+    const yieldPct = DIVIDENDS[s.code];
+    if(!yieldPct) return;
+    const pos = state.holdings[s.code];
+    if(!pos || pos.shares <= 0) return;
+    const last = state.lastDividendAt[s.code] || (new Date(state.user.joinedAt||0).getTime());
+    if(now - last < ONE_DAY) return;
+    const value = pos.shares * (state.prices[s.code]?.current || s.price);
+    const daily = Math.round(value * (yieldPct / 365 / 100));
+    if(daily <= 0) return;
+    state.cash += daily;
+    state.totalBonusEarned = (state.totalBonusEarned||0) + daily;
+    state.totalDividendEarned = (state.totalDividendEarned||0) + daily;
+    state.lastDividendAt[s.code] = now;
+    paid = true;
+    setTimeout(()=>toast(`💰 ${s.name} 배당금 +${fmt(daily)}원 수령`), 300);
+  });
+  if(paid) saveState();
 }
 
 function showRankUpOverlay(tier){
@@ -1554,10 +1596,12 @@ function initState(name){
     quizHistory:[],
     xp:0,
     prices:{},
-    lastRankLabel:'브론즈',
-    achievements:{ firstBuy:false, firstSell:false, ret5:false, ret10:false, ret20:false },
+    lastRankLabel:'아이언',
+    achievements:{},
     lastMissionBonus:'',
-    totalBonusEarned:0
+    totalBonusEarned:0,
+    totalDividendEarned:0,
+    lastDividendAt:{}
   };
   STOCKS.forEach(s=>{
     state.prices[s.code] = { current:s.price, prev:s.price, base:s.price };
@@ -1960,7 +2004,7 @@ function onQuizAnswer(idx){
       state.unlockedStocks.push(currentQuiz.code);
     }
     const isRQ = currentQuiz.isRequiz;
-    const bonus = isRQ ? 10000 : 50000;
+    const bonus = isRQ ? 5000 : 15000;
     state.cash += bonus;
     state.totalBonusEarned = (state.totalBonusEarned||0) + bonus;
     saveState();
@@ -1968,9 +2012,9 @@ function onQuizAnswer(idx){
       confetti();
       const s = getStock(currentQuiz.code);
       if(isRQ){
-        toast(`🔄 재도전 성공! +1만원 보너스`);
+        toast(`🔄 재도전 성공! +5천원 보너스`);
       } else {
-        toast(`🎉 ${s.name} 해금 + 정답 보너스 +5만원!`);
+        toast(`🎉 ${s.name} 해금 + 정답 보너스 +1만5천원!`);
       }
     }, 200);
     // 일일 미션 달성 체크 (오늘 3문제 정답)
@@ -1980,7 +2024,7 @@ function onQuizAnswer(idx){
     ).length + 1; // +1 for current answer not yet pushed
     if(todayCorrect >= 3 && state.lastMissionBonus !== todayStr){
       state.lastMissionBonus = todayStr;
-      setTimeout(()=>awardBonus(100000, '오늘의 미션 완료'), 1500);
+      setTimeout(()=>awardBonus(30000, '오늘의 미션 완료'), 1500);
     }
   } else {
     saveState();
@@ -2454,11 +2498,11 @@ function doTrade(mode, code, qty){
     const emoji = realizedPnl >= 0 ? '🟢' : '🔻';
     toast(`${emoji} ${s.name} ${qty}주 매도 · 실현손익 ${sign}${fmtKRW(realizedPnl)}`);
     if(!state.achievements) state.achievements = {};
-    if(!state.achievements.firstSell){ state.achievements.firstSell=true; setTimeout(()=>awardBonus(200000,'첫 매도 달성'),800); }
+    if(!state.achievements.firstSell){ state.achievements.firstSell=true; setTimeout(()=>awardBonus(50000,'첫 매도 달성'),800); }
   } else {
     toast(`✓ ${s.name} ${qty}주 매수 완료`);
     if(!state.achievements) state.achievements = {};
-    if(!state.achievements.firstBuy){ state.achievements.firstBuy=true; setTimeout(()=>awardBonus(200000,'첫 매수 달성'),800); }
+    if(!state.achievements.firstBuy){ state.achievements.firstBuy=true; setTimeout(()=>awardBonus(50000,'첫 매수 달성'),800); }
   }
   setTimeout(()=>renderDetail(code), 100);
   if(mode === 'buy')  setTimeout(()=>ftutCheck('ftut-buy-done'),  220);
@@ -2540,15 +2584,33 @@ function renderMy(){
   // 보너스 현황 카드
   const ach = state.achievements || {};
   const bonusList = [
-    { label:'퀴즈 정답', sub:'정답 1회당', amount:50000, done: (state.quizHistory||[]).filter(q=>q.correct).length > 0 },
-    { label:'오늘의 미션', sub:'하루 3문제 정답', amount:100000, done: !!state.lastMissionBonus },
-    { label:'첫 매수 달성', sub:'처음으로 주식 구매', amount:200000, done: !!ach.firstBuy },
-    { label:'첫 매도 달성', sub:'처음으로 주식 판매', amount:200000, done: !!ach.firstSell },
-    { label:'수익률 +5%', sub:'총자산 기준', amount:300000, done: !!ach.ret5 },
-    { label:'수익률 +10%', sub:'총자산 기준', amount:500000, done: !!ach.ret10 },
-    { label:'수익률 +20%', sub:'총자산 기준', amount:1000000, done: !!ach.ret20 },
+    { label:'퀴즈 정답', sub:'정답 1회당 +1만5천원', amount:15000, done: (state.quizHistory||[]).filter(q=>q.correct).length > 0 },
+    { label:'오늘의 미션', sub:'하루 3문제 정답', amount:30000, done: !!state.lastMissionBonus },
+    { label:'첫 매수 달성', sub:'처음으로 주식 구매', amount:50000, done: !!ach.firstBuy },
+    { label:'첫 매도 달성', sub:'처음으로 주식 판매', amount:50000, done: !!ach.firstSell },
+    { label:'자산 400만원 달성', sub:'보유 자산 400만원 돌파', amount:80000, done: !!ach.asset400 },
+    { label:'자산 600만원 달성', sub:'보유 자산 600만원 돌파', amount:150000, done: !!ach.asset600 },
+    { label:'자산 1000만원 달성', sub:'보유 자산 1000만원 돌파', amount:300000, done: !!ach.asset1000 },
+    { label:'자산 2200만원 달성', sub:'보유 자산 2200만원 돌파', amount:700000, done: !!ach.asset2200 },
+    { label:'자산 5500만원 달성', sub:'보유 자산 5500만원 돌파', amount:2000000, done: !!ach.asset5500 },
   ];
   const totalBonus = state.totalBonusEarned || 0;
+  const totalDiv = state.totalDividendEarned || 0;
+  // 배당 지급 종목 현황
+  const divHoldings = STOCKS.filter(s=>DIVIDENDS[s.code] && state.holdings[s.code]?.shares > 0);
+  const divSection = divHoldings.length > 0
+    ? `<div style="margin-top:10px;padding:10px 0;border-top:1px solid #F2F4F6;">
+        <div style="font-size:13px;font-weight:700;color:var(--text-2);margin-bottom:6px;">💰 배당 수익 (누적 +${fmtKRW(totalDiv)}원)</div>
+        ${divHoldings.map(s=>{
+          const pos = state.holdings[s.code];
+          const price = state.prices[s.code]?.current || s.price;
+          const annualIncome = Math.round(pos.shares * price * DIVIDENDS[s.code] / 100);
+          return `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;">
+            <span style="color:var(--text-2);">${s.name} (연 ${DIVIDENDS[s.code]}%)</span>
+            <span class="num" style="color:#059669;">~${fmtKRW(annualIncome)}원/년</span>
+          </div>`;
+        }).join('')}
+      </div>` : '';
   $('my-bonus-card').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <span style="color:var(--text-2);">총 획득 보너스</span>
@@ -2561,7 +2623,8 @@ function renderMy(){
           <div class="caption">${b.sub}</div>
         </div>
         <div class="num" style="font-weight:700;font-size:14px;${b.done?'color:var(--primary)':'color:var(--text-3)'};">+${fmtKRW(b.amount)}</div>
-      </div>`).join('')}`;
+      </div>`).join('')}
+    ${divSection}`;
 
   const total = state.quizHistory.length;
   const right = state.quizHistory.filter(q=>q.correct).length;
@@ -2848,9 +2911,10 @@ function tickPrices(){
     const p = state.prices[s.code];
     if(!p) return;
     p.prev = p.current;
-    const drift = (Math.random()-0.5) * 0.002; // ±0.1%
+    const drift = (Math.random()-0.495) * 0.004; // ±0.2%, 미세 상승 편향
     p.current = Math.max(100, Math.round(p.current * (1 + drift)));
   });
+  checkDividends();
   saveState();
   // Refresh visible screen
   const active = document.querySelector('.screen.active');
